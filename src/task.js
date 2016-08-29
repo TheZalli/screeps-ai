@@ -13,8 +13,13 @@ const tasks = {
     ATTACK: 'attack',
 };
 
+const stat = {
+    FAIL: -1,
+    OK: 0,
+    DONE: 1,
+}
 
-function do_task(creep, task, target) {
+function doTask(creep, task, target) {
     // get the task from the memory if not given as an argument
     if (task === undefined) {
         task = creep.memory.task;
@@ -24,19 +29,48 @@ function do_task(creep, task, target) {
         target = creep.memory.task_target;
     }
     switch (task) {
-        // we are harvesting energy
-        // target has to be an energy source
+        // we are harvesting
+        // target has to be an energy source or mineral deposit
         case tasks.HARVEST:
-            
+            return goToAndDo(creep, target,
+                (c,t) => c.harvest(t),
+                (c,t) => c.carry.energy >= c.carryCapacity);
         break;
 
-        // if task is idle or nothing, do nothing
-        case tasks.IDLE:
-        default:
+        case tasks.STORE_ENERGY:
+            var status = goToAndDo(creep, target,
+                (c,t) => c.transfer(t, RESOURCE_ENERGY),
+                (c,t) => true);
+        break;
 
+        // if the task is to idle or something else, do nothing
+        case tasks.IDLE:
+            return stat.DONE;
+        default:
+            return stat.FAIL;
     }
 }
 
+function goToAndDo(creep, target, action, end_condition) {
+    switch (action(creep, target)) {
+        case ERR_NOT_IN_RANGE:
+            creep.moveTo(target);
+            // TODO: check moveTo's possible error code
+            return stat.OK;
+        break;
+        case OK:
+            if (end_condition(creep, target)) {
+                // we are ready
+                return stat.DONE;
+            } else {
+                return stat.OK;
+            }
+        default:
+            // TODO: error messages for different error codes.
+            return stat.FAIL
+    }
+}
 
-//module.exports.task = task;
-module.exports.task_types = task_types;
+module.exports.tasks = tasks;
+module.exports.stat = stat;
+module.exports.doTask = doTask;
