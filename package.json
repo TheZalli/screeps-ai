@@ -1,0 +1,14 @@
+{
+    "name": "screeps_ai",
+    "version": "1.0.0",
+    "description": "Zalli's AI for the game Screeps",
+    "main": "src/main.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [
+        "screeps"
+    ],
+    "author": "Zalli",
+    "license": "ISC"
+}
