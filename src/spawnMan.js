@@ -1,82 +1,120 @@
 
+//var _ = require("lodash");
+
+// Contains a list of different types/castes of creeps and.
+// A creep can be classified into multiple types, but types that are supersets
+// of another one, shadow them.
+//
+// MOVE parts are automatically so don't add them as associated parts.
+//
+// The order of the types matter when classifying creeps, so sort them from the
+// least specific to the most specific.
 const CREEP_TYPES = {
-    // a creep with no useful active bodyparts other than maybe MOVE
-    // a super type for all types, so if a creep is civilian it can't be of any
-    // other type
+    // a creep with no active attack or work bodyparts
     civilian: {
-        // we don't want to create these
-        confs: {},
+        assocParts: [],
     },
-    // a creep that carries things, and just carries them
-    // if a creep has any other parts beside MOVE and CARRY, it's not a carrier.
-    // a carrier's speed is normally 1/2 units per tick on plains, except on the
-    // *_fast variants.
+    // any creep capable of healing
+    healer: {
+        assocParts: [HEAL],
+    },
+    // a claimer creep that claims room controllers
+    claimer: {
+        assocParts: [CLAIM],
+    },
+    // a creep that just carries things
     carrier: {
-        confs: {
-            // cost: 50, this is a fast variant
-            lvl0_fast:  [CARRY, MOVE],
-            // cost: 150
-            lvl1:       [CARRY, CARRY, MOVE],
-             // cost: 200
-            lvl1_fast:  [CARRY, CARRY, MOVE, MOVE],
-            // cost: 300
-            lvl2:       [CARRY, CARRY, CARRY, CARRY, MOVE, MOVE],
-            // cost: 400
-            lvl2_fast:  [CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE],
-            // cost: 450
-            lvl3:       [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY,
-                         MOVE, MOVE, MOVE],
-             // cost: 600
-             lvl3_fast: [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY,
-                          MOVE, MOVE, MOVE, MOVE, MOVE, MOVE],
-        },
-    }
-    // a worker type that does work
-    // a worker's speed is normally 1/2 units per tick on plains, except on the
-    // *_fast variants.
-    worker: {
-        confs: {
-            // cost: 200
-            lvl1:       [WORK, CARRY, MOVE],
-            // cost: 250
-            lvl1_fast:  [WORK, CARRY, MOVE, MOVE],
-            // cost: 400
-            lvl2:       [WORK, WORK, CARRY, CARRY, MOVE, MOVE],
-            // cost: 500
-            lvl2_fast:  [WORK, WORK, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE],
-        },
+        assocParts: [CARRY],
     },
-    // TODO
+    // a close-range soldier creep
+    warrior: {
+        assocParts: [ATTACK],
+    },
+    // a long-range soldier creep
+    ranger: {
+        assocParts: [RANGED_ATTACK],
+    },
+    // a worker creep that does work
+    worker: {
+        assocParts: [WORK, CARRY],
+    },
+    // a close-range combat version of the worker
+    saboteur: {
+        assocParts: [WORK, CARRY, ATTACK],
+    },
+    // a ranged combat version of the worker
+    sapper: {
+        assocParts: [WORK, CARRY, RANGED_ATTACK],
+    },
 };
 
 // Classifies the creep into one or more job types.
 // Note that disabled bodyparts affect into the returned type, because we use
 // creep.getActiveBodyparts.
-function classifyCreep(creep) {
+function getActiveType(creep) {
     var types = [];
 
-    if (creep.getActiveBodyparts(CARRY) > 0) {
-        if (creep.getActiveBodyparts(WORK) > 0) {
-            types.push("worker");
-        } else {
-            types.push("carrier");
+    // TODO
+
+    return types;
+};
+
+// Automatically creates a creep body that can be used to spawn a new creep,
+// using the parts from the given creep type, multiplying their amount level
+// times, adding toughness amount of TOUGH parts and adding enough MOVE parts to
+// get to the given maximum slowness.
+//
+// max_slowness tells how many ticks does it take for the creep to move 1 square
+// in plains, if all of the CARRY parts are full. The minimum value is 1.
+//
+// Example: get a default [WORK, CARRY, MOVE] worker body:
+// getCreepBody(["worker"], [1], 0, 2)
+// Example: get a [TOUGH, ATTACK, ATTACK, MOVE, MOVE, MOVE] warrior:
+// getCreepBody(["warrior"], [2], 1, 1)
+// Example: another way for getting a level 1 sapper:
+// getCreepBody(["worker", "ranger"], [1, 1], 0, 2)
+function getCreepBody(types, levels, toughness, max_slowness) {
+    // these two comparisons are for avoiding weird behaviour
+    if (max_slowness < 1) {
+        return new RangeError("max_slowness can't be <1 ("+max_slowness+")");
+    }
+    if (toughness < 0) {
+        return new RangeError("toughness can't be negative ("+toughness+")");
+    }
+
+    // the parts to be returned
+    var parts = [];
+
+    // add the parts from the types
+    for (var i = 0; i < types.length; i++) {
+        const type_parts = CREEP_TYPES[types[i]].assocParts;
+        // multiply them by the levels
+        for (const p of type_parts) {
+            for (var j = 0; j < levels[i]; j++) {
+                parts.push(p);
+            }
         }
     }
 
-    if (types === []) {
-        return ["civilian"];
-    } else {
-        return types;
+    // add the armor
+    for (var i = 0; i < toughness; i++) {
+        parts.push(TOUGH);
     }
+
+    // get the amount of move parts needed. Round up for the amount of added, I
+    // left it out since the for loop's condition does the same thing for us.
+    var move_part_am = parts.length / max_slowness;
+    // add the move parts
+    for (var i = 0; i < move_part_am; i++) {
+        parts.push(MOVE);
+    }
+
+    return parts;
 };
 
-function spawnCreep(spawner, type, configuration) {
-    spawner.createCreep(CREEP_TYPES[type].confs[configuration]);
+const mod = {
+    getCreepBody: getCreepBody,
+    //classifyCreep: classifyCreep,
 };
 
-const spawnMan = {
-    spawnCreep: spawnCreep,
-    classifyCreep: classifyCreep,
-};
-
-module.exports = spawnMan;
+module.exports = mod;
